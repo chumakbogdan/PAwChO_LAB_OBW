@@ -3,10 +3,11 @@ FROM python:3.11-alpine AS builder
 
 WORKDIR /app
 
+COPY requirements.txt .
+
 # Instalacja zależności systemowych (dla C-extensions)
 RUN apk add --no-cache build-base libffi-dev
-
-COPY requirements.txt .
+RUN pip install --upgrade setuptools==70.0.0
 
 # Instalacja zależności do katalogu tymczasowego
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
@@ -17,6 +18,8 @@ FROM python:3.11-alpine
 LABEL org.opencontainers.image.authors="Bahdan Chumak"
 
 WORKDIR /app
+
+RUN pip install --upgrade pip setuptools==70.0.0
 
 # Tylko potrzebne zależności (z /install z poprzedniego etapu)
 COPY --from=builder /install /usr/local

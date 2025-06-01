@@ -1,0 +1,13 @@
+
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.git
+.github
+.DS_Store
+build.sh
+*.png
+README*.md

@@ -5,36 +5,32 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-# Instalacja zależności systemowych (dla C-extensions)
 RUN apk add --no-cache build-base libffi-dev
 RUN pip install --upgrade setuptools==70.0.0
-
-# Instalacja zależności do katalogu tymczasowego
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Etap 2: finalny, ultralekki obraz
+# Etap 2: Finalny, ultralekki obraz
 FROM python:3.11-alpine
 
 LABEL org.opencontainers.image.authors="Bahdan Chumak"
+LABEL org.opencontainers.image.title="zadanie1-flask-app"
+LABEL org.opencontainers.image.description="Flask app for Docker Lab task 1 & 2"
+LABEL org.opencontainers.image.version="1.0.0"
 
 WORKDIR /app
 
 RUN pip install --upgrade pip setuptools==70.0.0
 
-# Tylko potrzebne zależności (z /install z poprzedniego etapu)
 COPY --from=builder /install /usr/local
 
-# Kopiujemy aplikację
 COPY app.py .
+COPY requirements.txt .
 
-# Zmniejszenie warstw, usunięcie cache
 RUN adduser -D appuser && chown -R appuser /app
 USER appuser
 
-# Port aplikacji
 EXPOSE 5001
 
-# Healthcheck (opcjonalny)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget -qO- http://localhost:5001/ || exit 1
 

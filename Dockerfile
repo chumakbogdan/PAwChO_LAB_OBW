@@ -19,7 +19,7 @@ LABEL org.opencontainers.image.version="1.0.0"
 
 WORKDIR /app
 
-RUN pip install --upgrade pip setuptools==70.0.0
+RUN pip install --upgrade setuptools
 
 COPY --from=builder /install /usr/local
 

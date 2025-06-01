@@ -2,12 +2,13 @@
 
 name: Build and Push Docker Image
 
+permissions:
+    packages: write
+    contents: read
+
 on:
   push:
     branches: [main]
-  permissions:
-    packages: write
-    contents: read
 
 jobs:
   build:

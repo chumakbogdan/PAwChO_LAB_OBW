@@ -38,17 +38,21 @@ Workflow wykonuje następujące kroki:
 ```yaml
 - name: Checkout repository
   uses: actions/checkout@v3
+```
 
 2. Konfiguracja QEMU i Docker Buildx
 
+```yaml
 - name: Set up QEMU
   uses: docker/setup-qemu-action@v2
 
 - name: Set up Docker Buildx
   uses: docker/setup-buildx-action@v2
+```
 
 3. Logowanie do DockerHub i GHCR
 
+```yaml
 - name: Log in to DockerHub
   uses: docker/login-action@v2
   with:
@@ -61,9 +65,11 @@ Workflow wykonuje następujące kroki:
     registry: ghcr.io
     username: ${{ github.actor }}
     password: ${{ secrets.GITHUB_TOKEN }}
+```
 
 4. Budowa i wypchnięcie obrazu multiarch
 
+```yaml
 - name: Build and push Docker image
   uses: docker/build-push-action@v5
   with:
@@ -73,45 +79,46 @@ Workflow wykonuje następujące kroki:
     tags: ghcr.io/${{ github.repository_owner }}/flask-app:latest
     cache-from: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest
     cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest,mode=max
+```
 
 5. Skanowanie obrazu pod kątem podatności
 
+```yaml
 - name: Scan image with Trivy
   uses: aquasecurity/trivy-action@v0.28.0
   with:
     image-ref: ghcr.io/${{ github.repository_owner }}/flask-app:latest
     severity: CRITICAL,HIGH
     exit-code: 1
+```
 
 6. Użycie cache (registry, mode=max)
 
+```yaml
 cache-from: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest
 cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest,mode=max
+```
 
 
-⸻
-
-Sekrety w GitHub Actions
+### Sekrety w GitHub Actions
 
 Repozytorium zawiera dwa sekrety:
 	•	DOCKERHUB_USERNAME
 	•	DOCKERHUB_TOKEN (access token z uprawnieniami RW)
 
-⸻
 
-Potwierdzenie działania
+### Potwierdzenie działania
 
 Workflow został uruchomiony na gałęzi main i zakończył się sukcesem. Obraz został opublikowany do:
 
-ghcr.io/<twoja-nazwa-uzytkownika>/flask-app:latest
+ghcr.io/chumakbogdan/flask-app:latest
 
 Zbudowane architektury:
 	•	linux/amd64
 	•	linux/arm64
 
-⸻
 
-Tagowanie obrazów
+### Tagowanie obrazów
 
 Aktualnie obraz oznaczony jest jako :latest.
 
@@ -121,24 +128,27 @@ Można rozszerzyć o:
 
 ⸻
 
-Tagowanie cache
+### Tagowanie cache
 
 Cache przechowywany w DockerHub:
 
-docker.io/<twoja-nazwa-uzytkownika>/cache:latest
+docker.io/chumakbogdan/cache:latest
 
 Z mode=max dla pełnej optymalizacji builda.
 
-⸻
+## Podsumowanie
 
-✅ Podsumowanie
-
-Wymaganie	Status
-Build z Dockerfile	✅
-Obsługa architektur linux/amd64, arm64	✅
-Skanowanie CVE (CRITICAL, HIGH)	✅
-Push tylko gdy brak krytycznych podatności	✅
-Cache registry z mode=max	✅
-Publiczne repozytorium GHCR	✅
+| Wymaganie	                                 | Status |
+|--------------------------------------------|--------|
+| Build z Dockerfile	                     |   ✅   |
+| Obsługa architektur linux/amd64, arm64	 |   ✅   |
+| Skanowanie CVE (CRITICAL, HIGH)	         |   ✅   |
+| Push tylko gdy brak krytycznych podatności |   ✅   |
+| Cache registry z mode=max	                 |   ✅   |
+| Publiczne repozytorium GHCR	             |   ✅   |
 
 ----
+
+## Zrzut ekranu z GHCR
+
+![zrzut GHCR](GHCR.png)

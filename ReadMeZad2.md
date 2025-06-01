@@ -40,7 +40,7 @@ Workflow wykonuje następujące kroki:
   uses: actions/checkout@v3
 ```
 
-2. Konfiguracja QEMU i Docker Buildx
+#### 2. Konfiguracja QEMU i Docker Buildx
 
 ```yaml
 - name: Set up QEMU
@@ -50,7 +50,7 @@ Workflow wykonuje następujące kroki:
   uses: docker/setup-buildx-action@v2
 ```
 
-3. Logowanie do DockerHub i GHCR
+#### 3. Logowanie do DockerHub i GHCR
 
 ```yaml
 - name: Log in to DockerHub
@@ -67,7 +67,7 @@ Workflow wykonuje następujące kroki:
     password: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-4. Budowa i wypchnięcie obrazu multiarch
+#### 4. Budowa i wypchnięcie obrazu multiarch
 
 ```yaml
 - name: Build and push Docker image
@@ -81,18 +81,18 @@ Workflow wykonuje następujące kroki:
     cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest,mode=max
 ```
 
-5. Skanowanie obrazu pod kątem podatności
+#### 5. Skanowanie obrazu pod kątem podatności
 
 ```yaml
 - name: Scan image with Trivy
-  uses: aquasecurity/trivy-action@v0.28.0
+  uses: aquasecurity/trivy-action@0.13.0
   with:
     image-ref: ghcr.io/${{ github.repository_owner }}/flask-app:latest
     severity: CRITICAL,HIGH
     exit-code: 1
 ```
 
-6. Użycie cache (registry, mode=max)
+#### 6. Użycie cache (registry, mode=max)
 
 ```yaml
 cache-from: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest
@@ -103,19 +103,19 @@ cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:la
 ### Sekrety w GitHub Actions
 
 Repozytorium zawiera dwa sekrety:
-	•	DOCKERHUB_USERNAME
-	•	DOCKERHUB_TOKEN (access token z uprawnieniami RW)
+ - `DOCKERHUB_USERNAME`
+ - `DOCKERHUB_TOKEN` (access token z uprawnieniami RW)
 
 
 ### Potwierdzenie działania
 
 Workflow został uruchomiony na gałęzi main i zakończył się sukcesem. Obraz został opublikowany do:
 
-ghcr.io/chumakbogdan/flask-app:latest
+[ghcr.io/chumakbogdan/flask-app:latest](https://github.com/chumakbogdan/PAwChO_LAB_OBW/pkgs/container/flask-app)
 
 Zbudowane architektury:
-	•	linux/amd64
-	•	linux/arm64
+ - `linux/amd64`
+ - `linux/arm64`
 
 
 ### Tagowanie obrazów
@@ -123,32 +123,29 @@ Zbudowane architektury:
 Aktualnie obraz oznaczony jest jako :latest.
 
 Można rozszerzyć o:
-	•	:sha-<hash> – unikalny commit
-	•	:v1.0.0 – wersja semantyczna
+ - `:sha-<hash>` – unikalny commit
+ - `:v1.0.0` – wersja semantyczna
 
-⸻
 
 ### Tagowanie cache
 
 Cache przechowywany w DockerHub:
-
+```
 docker.io/chumakbogdan/cache:latest
-
-Z mode=max dla pełnej optymalizacji builda.
+```
+Z `mode=max` dla pełnej optymalizacji builda.
 
 ## Podsumowanie
 
 | Wymaganie	                                 | Status |
 |--------------------------------------------|--------|
-| Build z Dockerfile	                     |   ✅   |
-| Obsługa architektur linux/amd64, arm64	 |   ✅   |
-| Skanowanie CVE (CRITICAL, HIGH)	         |   ✅   |
-| Push tylko gdy brak krytycznych podatności |   ✅   |
-| Cache registry z mode=max	                 |   ✅   |
-| Publiczne repozytorium GHCR	             |   ✅   |
+| Build z Dockerfile	                     |    ✅  |
+| Obsługa architektur linux/amd64, arm64	 |    ✅  |
+| Skanowanie CVE (CRITICAL, HIGH)	         |    ✅  |
+| Push tylko gdy brak krytycznych podatności |    ✅  |
+| Cache registry z mode=max	                 |    ✅  |
+| Publiczne repozytorium GHCR	             |    ✅  |
 
-----
-
-## Zrzut ekranu z GHCR
+### Zrzut ekranu z GHCR
 
 ![zrzut GHCR](GHCR.png)

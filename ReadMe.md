@@ -1,238 +1,158 @@
+# Zadanie 2
 
-# 🌦️ Weather App
+## Cel zadania
 
-Projekt **Weather App** to aplikacja webowa oparta na Pythonie i Flasku, która pozwala użytkownikowi wybrać kraj i miasto, a następnie pobrać aktualne dane pogodowe z API OpenWeather. Projekt uruchamiany jest w zoptymalizowanym, wieloetapowym kontenerze Docker.
+Celem zadania było opracować łańcuch (pipeline) w usłudzie GitHub Actions, który zbuduje obraz kontenera na podstawie Dockerfile-a oraz kodów źródłowych aplikacji opracowanej jako rozwiązanie zadania nr 1 a następnie prześle go do publicznego repozytorium autora na Github (ghcr.io).
 
-## 📁 Struktura Projektu
+Mimo to proces budowania obrazu powinien spełniać warunki:
+- Wspiera dwie architektury: `linux/amd64` oraz `linux/arm64`
+- Wykorzystuje cache warstw Docker BuildKit z rejestrem DockerHub (`mode=max`)
+- Wykonuje skanowanie obrazu na obecność luk bezpieczeństwa (CVE)
+- Wysyła obraz do publicznego rejestru kontenerów GitHub (`ghcr.io`)
+
+
+## Konfiguracja i wykonanie
+
+### 📁 Struktura repozytorium
 
 ```
 .
 ├── app.py
+├── Dockerfile
 ├── requirements.txt
-└── Dockerfile
+├── .dockerignore
+└── .github/
+    └── workflows/
+        └── docker.yml
 ```
 
-## 📄 Opis komponentów
+### Plik workflow: `.github/workflows/docker.yml`
 
-### 🔸 Backend (`app.py`)
+Workflow wykonuje następujące kroki:
 
-- Umożliwia wybór lokalizacji (PL, DE, FR), 
-- Pobiera dane pogodowe (temperatura, wilgotność, opis) z OpenWeather(https://openweathermap.org),
-- Zapisuje log uruchomienia do pliku app.log,
-- Dynamicznie aktualizuje listę miast na podstawie kraju (JS + Jinja),
-- Obsługuje błędy i pokazuje komunikaty użytkownikowi.
+#### 1. Pobranie kodu źródłowego z repozytorium
+Pipeline rozpoczyna się od pobrania aktualnego stanu kodu z gałęzi, na której został uruchomiony.
 
-```py
-from flask import Flask, request, render_template_string
-import logging
-import requests
-import datetime
-
-app = Flask(__name__)
-
-# Dane autora
-AUTHOR_NAME = "Bahdan Chumak"
-TCP_PORT = 5001
-
-# Konfiguracja logowania
-logging.basicConfig(level=logging.INFO, filename='app.log', filemode='a',
-                    format='%(asctime)s - %(message)s')
-x = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-print(f"Starting app with AUTHOR_NAME=Bahdan Chumak, TCP_PORT=5001, {x}")
-
-# Lista krajów i miast
-LOCATIONS = {
-    "PL": ["Warszawa", "Kraków", "Gdańsk"],
-    "DE": ["Berlin", "Monachium", "Hamburg"],
-    "FR": ["Paryż", "Marsylia", "Lyon"]
-}
-
-# Strona główna - wybór kraju i miasta
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        country = request.form['country']
-        city = request.form['city']
-        weather = get_weather(city, country)
-        return render_template_string(RESULT_TEMPLATE, city=city, country=country, weather=weather)
-    return render_template_string(FORM_TEMPLATE, locations=LOCATIONS)
-
-# Funkcja pobierania pogody
-def get_weather(city, country):
-    API_KEY = "7bbdfbba46560bb3dd10c4d9512b353e"
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city},{country}&appid={API_KEY}&units=metric&lang=pl"
-    print(f"Zapytanie URL: {url}")
-    response = requests.get(url)
-    print(f"Odpowiedź status code: {response.status_code}")
-    print(f"Odpowiedź tekst: {response.text}")
-    if response.status_code == 200:
-        data = response.json()
-        return {
-            'description': data['weather'][0]['description'],
-            'temperature': data['main']['temp'],
-            'humidity': data['main']['humidity']
-        }
-    else:
-        return {"error": "Nie udało się pobrać pogody."}
-
-# Szablony HTML (bez zmian)
-FORM_TEMPLATE = """
-<!doctype html>
-<title>Wybierz lokalizację</title>
-<h1>Wybierz kraj i miasto</h1>
-<form method="post">
-    <select name="country" id="country" onchange="updateCities()">
-    {% for country in locations %}
-        <option value="{{ country }}">{{ country }}</option>
-    {% endfor %}
-    </select>
-
-    <select name="city" id="city">
-    {% for city in locations[locations|list|first] %}
-        <option value="{{ city }}">{{ city }}</option>
-    {% endfor %}
-    </select>
-
-    <input type="submit" value="Pokaż pogodę">
-</form>
-
-<script>
-    const locations = {{ locations|tojson }};
-    function updateCities() {
-        const country = document.getElementById('country').value;
-        const citySelect = document.getElementById('city');
-        citySelect.innerHTML = '';
-        locations[country].forEach(function(city) {
-            const option = document.createElement('option');
-            option.text = city;
-            citySelect.add(option);
-        });
-    }
-</script>
-"""
-
-RESULT_TEMPLATE = """
-<!doctype html>
-<title>Wynik</title>
-<h1>Pogoda w {{ city }}, {{ country }}</h1>
-{% if weather.error %}
-<p>{{ weather.error }}</p>
-{% else %}
-<p>Opis: {{ weather.description }}</p>
-<p>Temperatura: {{ weather.temperature }} °C</p>
-<p>Wilgotność: {{ weather.humidity }}%</p>
-{% endif %}
-<br><a href="/">Wróć</a>
-"""
-
-if __name__ == "__main__":
-    logging.info(f"Application started by {AUTHOR_NAME} on TCP port {TCP_PORT}")
-    app.run(host="0.0.0.0", port=TCP_PORT)
-```
-![Alt Text](./Browser.png)
-
-Przykładowe logi:
-```
-Starting app with AUTHOR_NAME=Bahdan Chumak, TCP_PORT=5001, 2025-05-12 14:24:19
-```
-### 🔸 HTML + JavaScript(generowane dynamicznie)
-
-Frontend renderowany przez Flask zawiera:
-	•	formularz wyboru kraju i miasta,
-	•	dynamiczne przeładowywanie miast po zmianie kraju,
-	•	prezentację wyników pobranych z API pogodowego.
-
-
-### 🔸 requirements.txt
-
-Plik ten określa wymagane biblioteki Pythona:
-```
-Flask==2.3.3
-requests
+```yaml
+- name: Checkout repository
+  uses: actions/checkout@v3
 ```
 
-## 🐳 Dockerfile
+#### 2. Przygotowanie środowiska do budowy obrazów wieloarchitekturnych
+Aktywowane są narzędzia QEMU i Docker Buildx, które umożliwiają budowanie obrazów na różne architektury (np. amd64, arm64) w ramach jednej akcji.
 
-Projekt korzysta z wieloetapowego buildu (python:3.11-alpine) z minimalnym środowiskiem wykonawczym:
+```yaml
+- name: Set up QEMU
+  uses: docker/setup-qemu-action@v2
 
-```
-# Etap 1: Build dependencies
-FROM python:3.11-alpine AS builder
-
-WORKDIR /app
-
-COPY requirements.txt .
-
-# Instalacja zależności systemowych (dla C-extensions)
-RUN apk add --no-cache build-base libffi-dev
-RUN pip install --upgrade setuptools==70.0.0
-
-# Instalacja zależności do katalogu tymczasowego
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
-
-# Etap 2: finalny, ultralekki obraz
-FROM python:3.11-alpine
-
-LABEL org.opencontainers.image.authors="Bahdan Chumak"
-
-WORKDIR /app
-
-RUN pip install --upgrade pip setuptools==70.0.0
-
-# Tylko potrzebne zależności (z /install z poprzedniego etapu)
-COPY --from=builder /install /usr/local
-
-# Kopiujemy aplikację
-COPY app.py .
-
-# Zmniejszenie warstw, usunięcie cache
-RUN adduser -D appuser && chown -R appuser /app
-USER appuser
-
-# Port aplikacji
-EXPOSE 5001
-
-# Healthcheck (opcjonalny)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:5001/ || exit 1
-
-CMD ["python", "app.py"]
+- name: Set up Docker Buildx
+  uses: docker/setup-buildx-action@v2
 ```
 
-## 🐳 Docker: Budowanie i uruchamianie
+#### 3. Autoryzacja do DockerHub i GitHub Container Registry
+Pipeline loguje się do dwóch rejestrów:
+ - DockerHub – do wykorzystania i zapisu cache’a builda,
+ - GHCR (ghcr.io) – do publikacji końcowego obrazu kontenera.
 
-### a. Budowa obrazu kontenera
+Dane logowania są przechowywane jako sekrety GitHub.
 
-```bash
-docker build -t zadanie1 .
+```yaml
+- name: Log in to DockerHub
+  uses: docker/login-action@v2
+  with:
+    username: ${{ secrets.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+- name: Log in to GitHub Container Registry
+  uses: docker/login-action@v2
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### b. Uruchomienie kontenera
+#### 4. Budowanie i publikowanie obrazu dla wielu architektur
+W tej fazie tworzony jest obraz Dockera z wykorzystaniem Buildx. Obraz wspiera linux/amd64 oraz linux/arm64 i zostaje przesłany do GitHub Container Registry. Dodatkowo, podczas budowy wykorzystywany jest cache z DockerHub, co znacznie przyspiesza proces.
 
-```bash
-docker run -d -p 5001:5001 --name weather zadanie1
+```yaml
+- name: Build and push Docker image
+  uses: docker/build-push-action@v5
+  with:
+    context: .
+    platforms: linux/amd64,linux/arm64
+    push: true
+    tags: ghcr.io/${{ github.repository_owner }}/flask-app:latest
+    cache-from: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest
+    cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest,mode=max
 ```
 
-### c. Sprawdzenie logów uruchomieniowych
+#### 5. Skanowanie obrazu pod kątem zagrożeń bezpieczeństwa
+Przy pomocy narzędzia Trivy obraz jest analizowany pod kątem podatności o poziomie HIGH i CRITICAL. Jeśli którakolwiek z nich zostanie wykryta, pipeline zostaje przerwany — obraz nie zostanie opublikowany.
 
-```bash
-docker logs weather
+```yaml
+- name: Scan image with Trivy
+  uses: aquasecurity/trivy-action@0.13.0
+  with:
+    image-ref: ghcr.io/${{ github.repository_owner }}/flask-app:latest
+    severity: CRITICAL,HIGH
+    exit-code: 1
 ```
 
-### d. Sprawdzenie liczby warstw i rozmiaru obrazu
+#### 6. Zastosowanie cache warstw BuildKit
+Mechanizm cache’owania wykorzystuje zewnętrzny rejestr DockerHub jako źródło i miejsce zapisu cache’a (type=registry, mode=max). To sprawia, że kolejne budowy są szybsze i bardziej zoptymalizowane.
 
-```bash
-docker history zadanie1
-```
-
-## ✅ Zdrowie Aplikacji
-
-Aplikacja zawiera zdefiniowany HEALTHCHECK, który regularnie sprawdza dostępność głównej strony:
-
-```
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:5001/ || exit 1
+```yaml
+cache-from: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest
+cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest,mode=max
 ```
 
 
+### Sekrety wykorzystywane w GitHub Actions
 
+W celu prawidłowego działania pipeline’a, w repozytorium skonfigurowane są dwa sekrety:
+ - `DOCKERHUB_USERNAME` - nazwa konta DockerHub,
+ - `DOCKERHUB_TOKEN` - access token z uprawnieniami RW
+
+Są one używane do logowania się do rejestru w trakcie budowy i cache’owania obrazów.
+
+
+### Walidacja działania pipeline’a
+
+Workflow został poprawnie uruchomiony na gałęzi main. Proces zakończył się sukcesem, a zbudowany obraz został przesłany do:
+
+[ghcr.io/chumakbogdan/flask-app:latest](https://github.com/chumakbogdan/PAwChO_LAB_OBW/pkgs/container/flask-app)
+
+Wspierane architektury tego obrazu:
+ - `linux/amd64`
+ - `linux/arm64`
+
+
+### System tagowania obrazów
+
+Obecnie obraz oznaczany jest tagiem `:latest`, odpowiadającym najnowszej wersji.
+
+Istnieje możliwość rozbudowy systemu tagowania np. o:
+ - `:sha-<hash>` – identyfikator powiązany z konkretnym commitem Git,
+ - `:v1.0.0` – wersjonowanie semantyczne, np. dla wydań produkcyjnych.
+
+
+### Tagowanie i przechowywanie cache’a
+
+Podczas budowy cache warstw Dockera zapisywany jest w publicznym repozytorium:
+```
+docker.io/chumakbogdan/cache:latest
+```
+Tryb `mode=max` zapewnia zachowanie maksymalnej liczby warstw, co pozwala na znaczące przyspieszenie kolejnych buildów i lepsze wykorzystanie cache’a.
+
+
+## Podsumowanie
+
+Spełnione wymagania:
+ - Obraz wspiera dwie architektury: linux/arm64 oraz linux/amd64.
+ - Wykorzystywane są (wysyłanie i pobieranie) dane cache (eksporter: registry oraz backend-u registry w trybie max).
+ - Te dane cache są przechowywane w dedykowanym, publicznym repozytorium na DockerHub.
+ - Jest wykonany test CVE obrazu, który zapewnia, że obraz zostanie przesłany do publicznego repozytorium obrazów na GitHub tylko wtedy gdy nie zawiera zagrożeń sklasyfikowanych jako krytyczne lub wysokie.
+
+### Zrzut ekranu z `ghcr.io/chumakbogdan/flask-app:latest`
+
+![zrzut GHCR](GHCR.png)

@@ -13,8 +13,8 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM python:3.11-alpine
 
 LABEL org.opencontainers.image.authors="Bahdan Chumak"
-LABEL org.opencontainers.image.title="zadanie1-flask-app"
-LABEL org.opencontainers.image.description="Flask app for Docker Lab task 1 & 2"
+LABEL org.opencontainers.image.title="zadanie2-flask-app"
+LABEL org.opencontainers.image.description="Flask app for Docker Lab task 2"
 LABEL org.opencontainers.image.version="1.0.0"
 
 WORKDIR /app

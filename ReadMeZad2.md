@@ -2,18 +2,14 @@
 
 ## Cel zadania
 
-Celem zadania było opracowanie łańcucha CI/CD (pipeline) z wykorzystaniem GitHub Actions, który:
+Celem zadania było opracować łańcuch (pipeline) w usłudzie GitHub Actions, który zbuduje obraz kontenera na podstawie Dockerfile-a oraz kodów źródłowych aplikacji opracowanej jako rozwiązanie zadania nr 1 a następnie prześle go do publicznego repozytorium autora na Github (ghcr.io).
 
-----
-
-- Buduje obraz kontenera na podstawie aplikacji napisanej w Pythonie z użyciem Flask (Zadanie 1)
-- Wykorzystuje `Dockerfile`
-- Wspiera wiele architektur: `linux/amd64` oraz `linux/arm64`
+Mimo to proces budowania obrazu powinien spełniać warunki:
+- Wspiera dwie architektury: `linux/amd64` oraz `linux/arm64`
+- Wykorzystuje cache warstw Docker BuildKit z rejestrem DockerHub (`mode=max`)
 - Wykonuje skanowanie obrazu na obecność luk bezpieczeństwa (CVE)
 - Wysyła obraz do publicznego rejestru kontenerów GitHub (`ghcr.io`)
-- Wykorzystuje cache warstw Docker BuildKit z rejestrem DockerHub (`mode=max`)
 
-----
 
 ## Konfiguracja i wykonanie
 
@@ -34,13 +30,16 @@ Celem zadania było opracowanie łańcucha CI/CD (pipeline) z wykorzystaniem Git
 
 Workflow wykonuje następujące kroki:
 
-#### 1. Checkout repozytorium
+#### 1. Pobranie kodu źródłowego z repozytorium
+Pipeline rozpoczyna się od pobrania aktualnego stanu kodu z gałęzi, na której został uruchomiony.
+
 ```yaml
 - name: Checkout repository
   uses: actions/checkout@v3
 ```
 
-#### 2. Konfiguracja QEMU i Docker Buildx
+#### 2. Przygotowanie środowiska do budowy obrazów wieloarchitekturnych
+Aktywowane są narzędzia QEMU i Docker Buildx, które umożliwiają budowanie obrazów na różne architektury (np. amd64, arm64) w ramach jednej akcji.
 
 ```yaml
 - name: Set up QEMU
@@ -50,7 +49,12 @@ Workflow wykonuje następujące kroki:
   uses: docker/setup-buildx-action@v2
 ```
 
-#### 3. Logowanie do DockerHub i GHCR
+#### 3. Autoryzacja do DockerHub i GitHub Container Registry
+Pipeline loguje się do dwóch rejestrów:
+ - DockerHub – do wykorzystania i zapisu cache’a builda,
+ - GHCR (ghcr.io) – do publikacji końcowego obrazu kontenera.
+
+Dane logowania są przechowywane jako sekrety GitHub.
 
 ```yaml
 - name: Log in to DockerHub
@@ -67,7 +71,8 @@ Workflow wykonuje następujące kroki:
     password: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-#### 4. Budowa i wypchnięcie obrazu multiarch
+#### 4. Budowanie i publikowanie obrazu dla wielu architektur
+W tej fazie tworzony jest obraz Dockera z wykorzystaniem Buildx. Obraz wspiera linux/amd64 oraz linux/arm64 i zostaje przesłany do GitHub Container Registry. Dodatkowo, podczas budowy wykorzystywany jest cache z DockerHub, co znacznie przyspiesza proces.
 
 ```yaml
 - name: Build and push Docker image
@@ -81,7 +86,8 @@ Workflow wykonuje następujące kroki:
     cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest,mode=max
 ```
 
-#### 5. Skanowanie obrazu pod kątem podatności
+#### 5. Skanowanie obrazu pod kątem zagrożeń bezpieczeństwa
+Przy pomocy narzędzia Trivy obraz jest analizowany pod kątem podatności o poziomie HIGH i CRITICAL. Jeśli którakolwiek z nich zostanie wykryta, pipeline zostaje przerwany — obraz nie zostanie opublikowany.
 
 ```yaml
 - name: Scan image with Trivy
@@ -92,7 +98,8 @@ Workflow wykonuje następujące kroki:
     exit-code: 1
 ```
 
-#### 6. Użycie cache (registry, mode=max)
+#### 6. Zastosowanie cache warstw BuildKit
+Mechanizm cache’owania wykorzystuje zewnętrzny rejestr DockerHub jako źródło i miejsce zapisu cache’a (type=registry, mode=max). To sprawia, że kolejne budowy są szybsze i bardziej zoptymalizowane.
 
 ```yaml
 cache-from: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:latest
@@ -100,52 +107,52 @@ cache-to: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cache:la
 ```
 
 
-### Sekrety w GitHub Actions
+### Sekrety wykorzystywane w GitHub Actions
 
-Repozytorium zawiera dwa sekrety:
- - `DOCKERHUB_USERNAME`
- - `DOCKERHUB_TOKEN` (access token z uprawnieniami RW)
+W celu prawidłowego działania pipeline’a, w repozytorium skonfigurowane są dwa sekrety:
+ - `DOCKERHUB_USERNAME` - nazwa konta DockerHub,
+ - `DOCKERHUB_TOKEN` - access token z uprawnieniami RW
+
+Są one używane do logowania się do rejestru w trakcie budowy i cache’owania obrazów.
 
 
-### Potwierdzenie działania
+### Walidacja działania pipeline’a
 
-Workflow został uruchomiony na gałęzi main i zakończył się sukcesem. Obraz został opublikowany do:
+Workflow został poprawnie uruchomiony na gałęzi main. Proces zakończył się sukcesem, a zbudowany obraz został przesłany do:
 
 [ghcr.io/chumakbogdan/flask-app:latest](https://github.com/chumakbogdan/PAwChO_LAB_OBW/pkgs/container/flask-app)
 
-Zbudowane architektury:
+Wspierane architektury tego obrazu:
  - `linux/amd64`
  - `linux/arm64`
 
 
-### Tagowanie obrazów
+### System tagowania obrazów
 
-Aktualnie obraz oznaczony jest jako :latest.
+Obecnie obraz oznaczany jest tagiem :latest, odpowiadającym najnowszej wersji.
 
-Można rozszerzyć o:
- - `:sha-<hash>` – unikalny commit
- - `:v1.0.0` – wersja semantyczna
+Istnieje możliwość rozbudowy systemu tagowania np. o:
+ - `:sha-<hash>` – identyfikator powiązany z konkretnym commitem Git,
+ - `:v1.0.0` – wersjonowanie semantyczne, np. dla wydań produkcyjnych.
 
 
-### Tagowanie cache
+### Tagowanie i przechowywanie cache’a
 
-Cache przechowywany w DockerHub:
+Podczas budowy cache warstw Dockera zapisywany jest w publicznym repozytorium:
 ```
 docker.io/chumakbogdan/cache:latest
 ```
-Z `mode=max` dla pełnej optymalizacji builda.
+Tryb `mode=max` zapewnia zachowanie maksymalnej liczby warstw, co pozwala na znaczące przyspieszenie kolejnych buildów i lepsze wykorzystanie cache’a.
+
 
 ## Podsumowanie
 
-| Wymaganie	                                 | Status |
-|--------------------------------------------|--------|
-| Build z Dockerfile	                     |    ✅  |
-| Obsługa architektur linux/amd64, arm64	 |    ✅  |
-| Skanowanie CVE (CRITICAL, HIGH)	         |    ✅  |
-| Push tylko gdy brak krytycznych podatności |    ✅  |
-| Cache registry z mode=max	                 |    ✅  |
-| Publiczne repozytorium GHCR	             |    ✅  |
+Spełnione wymagania:
+ - Obraz wspiera dwie architektury: linux/arm64 oraz linux/amd64.
+ - Wykorzystywane są (wysyłanie i pobieranie) dane cache (eksporter: registry oraz backend-u registry w trybie max).
+ - Te dane cache są przechowywane w dedykowanym, publicznym repozytorium na DockerHub.
+ - Jest wykonany test CVE obrazu, który zapewnia, że obraz zostanie przesłany do publicznego repozytorium obrazów na GitHub tylko wtedy gdy nie zawiera zagrożeń sklasyfikowanych jako krytyczne lub wysokie.
 
-### Zrzut ekranu z GHCR
+### Zrzut ekranu z `ghcr.io/chumakbogdan/flask-app:latest`
 
 ![zrzut GHCR](GHCR.png)

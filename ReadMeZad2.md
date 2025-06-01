@@ -129,7 +129,7 @@ Wspierane architektury tego obrazu:
 
 ### System tagowania obrazów
 
-Obecnie obraz oznaczany jest tagiem :latest, odpowiadającym najnowszej wersji.
+Obecnie obraz oznaczany jest tagiem `:latest`, odpowiadającym najnowszej wersji.
 
 Istnieje możliwość rozbudowy systemu tagowania np. o:
  - `:sha-<hash>` – identyfikator powiązany z konkretnym commitem Git,
